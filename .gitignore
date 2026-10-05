@@ -3,3 +3,9 @@ build/
 
 # vscode conf
 .vscode
+
+# Virtual enviroment
+venv/
+
+# Data acquired
+experiments
