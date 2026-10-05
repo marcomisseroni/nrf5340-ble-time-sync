@@ -1,0 +1,13 @@
+# Target labels
+ conn_time_sync
+# Source files and their labels
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/CMakeFiles/conn_time_sync
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/CMakeFiles/conn_time_sync.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/CMakeFiles/conn_time_sync-complete.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/conn_time_sync-prefix/src/conn_time_sync-stamp/conn_time_sync-build.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/conn_time_sync-prefix/src/conn_time_sync-stamp/conn_time_sync-configure.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/conn_time_sync-prefix/src/conn_time_sync-stamp/conn_time_sync-download.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/conn_time_sync-prefix/src/conn_time_sync-stamp/conn_time_sync-install.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/conn_time_sync-prefix/src/conn_time_sync-stamp/conn_time_sync-mkdir.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/conn_time_sync-prefix/src/conn_time_sync-stamp/conn_time_sync-patch.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/_sysbuild/sysbuild/images/conn_time_sync-prefix/src/conn_time_sync-stamp/conn_time_sync-update.rule

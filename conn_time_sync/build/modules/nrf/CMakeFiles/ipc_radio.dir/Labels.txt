@@ -1,0 +1,13 @@
+# Target labels
+ ipc_radio
+# Source files and their labels
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/CMakeFiles/ipc_radio
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/CMakeFiles/ipc_radio.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/CMakeFiles/ipc_radio-complete.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/ipc_radio-prefix/src/ipc_radio-stamp/ipc_radio-build.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/ipc_radio-prefix/src/ipc_radio-stamp/ipc_radio-configure.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/ipc_radio-prefix/src/ipc_radio-stamp/ipc_radio-download.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/ipc_radio-prefix/src/ipc_radio-stamp/ipc_radio-install.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/ipc_radio-prefix/src/ipc_radio-stamp/ipc_radio-mkdir.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/ipc_radio-prefix/src/ipc_radio-stamp/ipc_radio-patch.rule
+/home/m4rch0/marco/master/master_thesis/nrf5340_sync/conn_time_sync/build/modules/nrf/ipc_radio-prefix/src/ipc_radio-stamp/ipc_radio-update.rule

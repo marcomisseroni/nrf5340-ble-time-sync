@@ -1,0 +1,2 @@
+"nrf":"/home/m4rch0/ncs/v3.4.1/nrf":"/home/m4rch0/ncs/v3.4.1/nrf/sysbuild"
+"mcuboot":"/home/m4rch0/ncs/v3.4.1/bootloader/mcuboot":"/home/m4rch0/ncs/v3.4.1/bootloader/mcuboot/boot/zephyr/sysbuild"
