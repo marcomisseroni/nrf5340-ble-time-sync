@@ -1,2 +1,5 @@
 # Build directory
 build/
+
+# vscode conf
+.vscode
