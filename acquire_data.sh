@@ -31,8 +31,7 @@ cd conn_time_sync
 for (( i=INC; i<=MAX_N; i+=INC )); do
     echo "Simulatin with N = $i"
     echo "***************************  BUILDING  ***************************"
-    west build -b nrf5340dk/nrf5340/cpuapp -p \
-    -- -Dconn_time_sync_CONN_INTERVAL_UNITS=$i \
+    CONN_INTERVAL_UNITS=$i west build -b nrf5340dk/nrf5340/cpuapp -p \
     > log.txt || exit 1
     IS_FIRST=1
     COUNTER=1
