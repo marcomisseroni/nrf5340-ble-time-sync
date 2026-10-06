@@ -21,6 +21,7 @@ MAX_N=3200
 N_SIM=10
 INC=$(( MAX_N / N_SIM ))
 DURATION=800
+source ble_sync_measurements/venv/bin/activate
 
 echo "*************************** STARTING LOGIC ANALYZER SOFTWARE  ***************************"
 
@@ -50,14 +51,13 @@ for (( i=INC; i<=MAX_N; i+=INC )); do
         (( COUNTER+=2 ))
     done 
     echo "***************************  STARTING CAPTURE  ***************************"
-    source ../ble_sync_measurements/venv/bin/activate
     cd ../ble_sync_measurements/experiments
     sleep 5
     python3 ../capture.py --duration $DURATION
     (( DURATION += INC ))
     OUT=$(ls -dt output-*/ | head -1)
     python3 ../analyze.py $OUT $i
-    cd ../conn_time_sync
+    cd ../../conn_time_sync
 done
 
 kill %1
