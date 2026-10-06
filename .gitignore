@@ -9,3 +9,6 @@ venv/
 
 # Data acquired
 experiments
+
+# Logs
+log.txt
