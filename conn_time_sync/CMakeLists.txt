@@ -28,3 +28,8 @@ elseif(CONFIG_SOC_SERIES_NRF54L OR CONFIG_SOC_SERIES_NRF54H)
 else()
   message(FATAL_ERROR "Unsupported series")
 endif()
+
+if(NOT DEFINED CONN_INTERVAL_UNITS)
+set(CONN_INTERVAL_UNITS 8)
+endif()
+target_compile_definitions(app PRIVATE CONN_INTERVAL_UNITS=${CONN_INTERVAL_UNITS})

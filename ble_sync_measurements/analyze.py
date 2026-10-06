@@ -11,6 +11,7 @@ from pathlib import Path
 # Parse the arguments: just the directory containing the data is required
 parser = argparse.ArgumentParser(description="Analyze the data recorded using the logic analyzer")
 parser.add_argument("dir", type=Path, help="Directory containing the data to analyze")
+parser.add_argument("n", type=int, help="Number of unit of the connection interval (CI = n * 1.25ms)")
 args = parser.parse_args()
 
 df = pd.read_csv(args.dir / "digital.csv")
@@ -88,6 +89,31 @@ print(f"Total events:   {total_events} (edges of the central)")
 print(f"Matched events: {len(edges)} ({len(edges) / total_events:.1%})")
 print("Sync errors [us]:")
 print(statistics.to_string(float_format=lambda x: f"{x:8.3f}"))
+
+# Save the std of this run in the summary used to plot std vs connection
+# interval, one row per run. std_pc is the mean of the stds of the
+# peripheral-central pairs, std_pp the mean of the peripheral-peripheral ones
+# (NaN if there are none). Re-analyzing a directory replaces its row
+EXPERIMENTS_DIR = Path(__file__).parent / "experiments"
+SUMMARY_PATH = EXPERIMENTS_DIR / "std_summary.csv"
+stds = statistics["std"]
+is_pc = stds.index.str.endswith("-C")
+try:
+    run_dir = str(args.dir.resolve().relative_to(EXPERIMENTS_DIR.resolve()))
+except ValueError:
+    run_dir = str(args.dir)
+row = pd.DataFrame([{
+    "dir": run_dir,
+    "n": args.n,
+    "ci_ms": args.n * 1.25,
+    "std_pc": stds[is_pc].mean(),
+    "std_pp": stds[~is_pc].mean(),
+}])
+if SUMMARY_PATH.exists():
+    old = pd.read_csv(SUMMARY_PATH)
+    row = pd.concat([old[old["dir"] != run_dir], row], ignore_index=True)
+row.sort_values("n").to_csv(SUMMARY_PATH, index=False)
+print(f"Std summary updated in {SUMMARY_PATH}")
 
 # Histogram of the sync errors, one panel per pair with a shared x axis.
 # The timestamps are quantized by the sampling period, so the bins are centered

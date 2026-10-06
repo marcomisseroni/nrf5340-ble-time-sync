@@ -16,7 +16,7 @@
  * Change only this to sweep the sync frequency; everything below derives
  * from it and stays valid for any 6 <= N <= 3200 (the spec's own bounds).
  */
-#define CONN_INTERVAL_UNITS 3200
+//#define CONN_INTERVAL_UNITS 3200
 #define CONN_INTERVAL_US    (CONN_INTERVAL_UNITS * 1250)
 
 /* Same N, but interpreted in units of 10 ms for the supervision timeout:
