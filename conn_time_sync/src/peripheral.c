@@ -16,6 +16,52 @@
 
 #define PERIPHERAL_TRIGGER_CORRECTION_NS 0
 
+// Data exchange;
+static uint32_t test_val = 0;
+
+static ssize_t test_data_received(struct bt_conn *conn,
+					     const struct bt_gatt_attr *attr,
+					     void *buf, uint16_t len,
+					     uint16_t offset)
+{
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &test_val, sizeof(uint32_t));
+}
+
+static bool test_data_notify_enabled;
+
+static void test_data_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+	test_data_notify_enabled = (value == BT_GATT_CCC_NOTIFY);
+	printk("Data exchange notifications %s\n",
+	       test_data_notify_enabled ? "enabled" : "disabled");
+}
+
+BT_GATT_SERVICE_DEFINE(test_data_service,
+	BT_GATT_PRIMARY_SERVICE(BT_UUID_TEST_DATA_SERVICE),
+	BT_GATT_CHARACTERISTIC(BT_UUID_TEST_DATA_CHAR,
+		BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+		BT_GATT_PERM_READ, test_data_received, NULL, NULL),
+	BT_GATT_CCC(test_data_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE));
+
+static void test_data_notify_work_handler(struct k_work *work)
+{
+	int err;
+
+	/* The value changes at every notification, so that the central can see
+	 * whether one is missing.
+	 */
+	test_val++;
+
+	/* NULL connection: notify every subscribed connection. */
+	err = bt_gatt_notify_uuid(NULL, BT_UUID_TEST_DATA_CHAR, test_data_service.attrs,
+				  &test_val, sizeof(test_val));
+	if (err) {
+		printk("Data exchange notify failed, %d\n", err);
+	}
+}
+
+K_WORK_DEFINE(test_data_notify_work, test_data_notify_work_handler);
+
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
@@ -101,6 +147,8 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
+	test_data_notify_enabled = false;
+
 	printk("Disconnected: %s, reason 0x%02x %s\n", addr, reason, bt_hci_err_to_str(reason));
 
 	adv_start();
@@ -158,6 +206,13 @@ static bool on_vs_evt(struct net_buf_simple *buf)
 
 	bt_conn_unref(conn);
 	conn = NULL;
+
+	/* One notification per connection event. It is sent from the system workqueue,
+	 * so that this callback stays short.
+	 */
+	if (test_data_notify_enabled) {
+		k_work_submit(&test_data_notify_work);
+	}
 
 	if (atomic_test_and_set_bit(&last_timed_action_in_use, 0)) {
 		return true;

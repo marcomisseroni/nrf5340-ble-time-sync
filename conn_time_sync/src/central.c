@@ -55,6 +55,7 @@ static bool led_value;
 static uint8_t volatile conn_count;
 
 static const struct bt_uuid *timed_char_uuid = BT_UUID_TIMED_ACTION_CHAR;
+static const struct bt_uuid *data_exch_char_uuid = BT_UUID_TEST_DATA_CHAR;
 
 static struct {
 	atomic_t last_anchor_point_in_use;
@@ -63,7 +64,15 @@ static struct {
 	uint64_t last_anchor_point_timestamp;
 	struct timed_action timed_action_msg;
 	struct bt_gatt_discover_params discovery_params;
+	uint16_t data_exch_char_handle;
+	struct bt_gatt_discover_params data_exch_discovery_params;
 } conn_state[CONFIG_BT_MAX_CONN];
+
+/* Kept outside conn_state, which is zeroed on disconnection, because the Bluetooth
+ * stack holds on to the subscription parameters while the subscription is active.
+ */
+static struct bt_gatt_subscribe_params data_exch_subscribe_params[CONFIG_BT_MAX_CONN];
+static struct bt_gatt_discover_params data_exch_ccc_discovery_params[CONFIG_BT_MAX_CONN];
 
 static void send_timestamp_to_peripheral(struct bt_conn *conn, void *data)
 {
@@ -200,18 +209,89 @@ static void scan_start(void)
 	printk("Scanning started\n");
 }
 
+static uint8_t on_data_notify(struct bt_conn *conn,
+	struct bt_gatt_subscribe_params *params,
+	const void *data, uint16_t length)
+{
+	uint32_t value;
+
+	if (data == NULL) {
+		printk("Data exchange: unsubscribed\n");
+		return BT_GATT_ITER_STOP;
+	}
+
+	if (length != sizeof(value)) {
+		printk("Data exchange: unexpected length %u\n", length);
+		return BT_GATT_ITER_CONTINUE;
+	}
+
+	memcpy(&value, data, sizeof(value));
+	printk("Data exchange: received %u\n", value);
+
+	return BT_GATT_ITER_CONTINUE;
+}
+
+static void on_data_subscribed(struct bt_conn *conn, uint8_t err,
+	struct bt_gatt_subscribe_params *params)
+{
+	if (err) {
+		printk("Data exchange subscription failed, ATT error 0x%02x\n", err);
+	} else {
+		printk("Data exchange subscription completed\n");
+	}
+}
+
 static uint8_t on_service_discover(struct bt_conn *conn,
 	const struct bt_gatt_attr *attr,
 	struct bt_gatt_discover_params *params)
 {
-	if (attr) {
-		uint8_t conn_index = bt_conn_index(conn);
+	uint8_t conn_index = bt_conn_index(conn);
+	int err;
 
+	/* Discovery of the data exchange characteristic: subscribe to it once found. */
+	if (params == &conn_state[conn_index].data_exch_discovery_params) {
+		struct bt_gatt_subscribe_params *sub = &data_exch_subscribe_params[conn_index];
+
+		if (!attr) {
+			printk("Data exchange discovery failed\n");
+			return BT_GATT_ITER_STOP;
+		}
+
+		conn_state[conn_index].data_exch_char_handle = bt_gatt_attr_value_handle(attr);
+		printk("Data exchange discovery completed\n");
+
+		memset(sub, 0, sizeof(*sub));
+		atomic_set_bit(sub->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+		sub->notify = on_data_notify;
+		sub->subscribe = on_data_subscribed;
+		sub->value_handle = conn_state[conn_index].data_exch_char_handle;
+		/* CCC handle unknown: let the stack discover it. */
+		sub->ccc_handle = BT_GATT_AUTO_DISCOVER_CCC_HANDLE;
+		sub->end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
+		sub->disc_params = &data_exch_ccc_discovery_params[conn_index];
+		sub->value = BT_GATT_CCC_NOTIFY;
+
+		err = bt_gatt_subscribe(conn, sub);
+		if (err) {
+			printk("Data exchange subscribe request failed, %d\n", err);
+		}
+
+		return BT_GATT_ITER_STOP;
+	}
+
+	/* Discovery of the timed action characteristic (sync). */
+	if (attr) {
 		conn_state[conn_index].timed_action_char_handle =
 			bt_gatt_attr_value_handle(attr);
 		printk("Service discovery completed\n");
 	} else {
 		printk("Service discovery failed\n");
+	}
+
+	/* Only one discovery at a time per connection: start the next one now. */
+	err = bt_gatt_discover(conn, &conn_state[conn_index].data_exch_discovery_params);
+	if (err) {
+		printk("Discovery for data exchange failed, %d\n", err);
 	}
 
 	return BT_GATT_ITER_STOP;
@@ -239,6 +319,12 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	conn_state[conn_index].discovery_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
 	conn_state[conn_index].discovery_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 	conn_state[conn_index].discovery_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
+
+	conn_state[conn_index].data_exch_discovery_params.uuid = data_exch_char_uuid;
+	conn_state[conn_index].data_exch_discovery_params.func = on_service_discover;
+	conn_state[conn_index].data_exch_discovery_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
+	conn_state[conn_index].data_exch_discovery_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
+	conn_state[conn_index].data_exch_discovery_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
 
 	err = bt_gatt_discover(conn, &conn_state[conn_index].discovery_params);
 	if (err) {
