@@ -45,6 +45,15 @@
 #define BT_UUID_TEST_DATA_CHAR \
 	BT_UUID_DECLARE_128(BT_UUID_TEST_DATA_CHAR_VAL)
 
+/** @brief Size in bytes of the test data sent with every notification.
+ *
+ * The first 8 bytes hold a counter, the rest is padding.
+ */
+#ifndef DATA_SIZE
+#define DATA_SIZE 12
+#endif
+BUILD_ASSERT(DATA_SIZE >= sizeof(uint64_t), "DATA_SIZE must hold the 8-byte counter");
+
 /** @brief Start central demo. */
 void central_start(void);
 

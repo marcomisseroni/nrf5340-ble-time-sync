@@ -17,14 +17,14 @@
 #define PERIPHERAL_TRIGGER_CORRECTION_NS 0
 
 // Data exchange;
-static uint32_t test_val = 0;
+static uint8_t payload[DATA_SIZE];
 
 static ssize_t test_data_received(struct bt_conn *conn,
 					     const struct bt_gatt_attr *attr,
 					     void *buf, uint16_t len,
 					     uint16_t offset)
 {
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, &test_val, sizeof(uint32_t));
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &payload, sizeof(payload));
 }
 
 static bool test_data_notify_enabled;
@@ -46,15 +46,18 @@ BT_GATT_SERVICE_DEFINE(test_data_service,
 static void test_data_notify_work_handler(struct k_work *work)
 {
 	int err;
+	uint64_t counter;
 
-	/* The value changes at every notification, so that the central can see
-	 * whether one is missing.
+	/* The counter in the first 8 bytes changes at every notification, so
+	 * that the central can see whether one is missing.
 	 */
-	test_val++;
+	memcpy(&counter, payload, sizeof(counter));
+	counter++;
+	memcpy(payload, &counter, sizeof(counter));
 
 	/* NULL connection: notify every subscribed connection. */
 	err = bt_gatt_notify_uuid(NULL, BT_UUID_TEST_DATA_CHAR, test_data_service.attrs,
-				  &test_val, sizeof(test_val));
+				  &payload, sizeof(payload));
 	if (err) {
 		printk("Data exchange notify failed, %d\n", err);
 	}

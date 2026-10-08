@@ -213,20 +213,21 @@ static uint8_t on_data_notify(struct bt_conn *conn,
 	struct bt_gatt_subscribe_params *params,
 	const void *data, uint16_t length)
 {
-	uint32_t value;
+	uint64_t counter;
 
 	if (data == NULL) {
 		printk("Data exchange: unsubscribed\n");
 		return BT_GATT_ITER_STOP;
 	}
 
-	if (length != sizeof(value)) {
+	if (length != DATA_SIZE) {
 		printk("Data exchange: unexpected length %u\n", length);
 		return BT_GATT_ITER_CONTINUE;
 	}
 
-	memcpy(&value, data, sizeof(value));
-	printk("Data exchange: received %u\n", value);
+	/* The counter is in the first 8 bytes, the rest is padding. */
+	memcpy(&counter, data, sizeof(counter));
+	printk("Data exchange: received %llu\n", counter);
 
 	return BT_GATT_ITER_CONTINUE;
 }
