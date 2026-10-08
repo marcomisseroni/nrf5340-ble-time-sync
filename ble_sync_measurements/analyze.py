@@ -50,7 +50,7 @@ if not PERIPHERALS:
 # half the period of the signal (edges now occur every half period, since
 # rising and falling edges are both matched), otherwise edges of different
 # events get matched
-MATCH_TOLERANCE_S = 10e-3
+MATCH_TOLERANCE_S = 0.1 * args.n * 1.25e-3  # 10% of the CI: edges occur once per CI
 
 def edge_times(ch):
     return df.loc[df[f"{ch} edge"] == 1, ["Time [s]"]].rename(columns={"Time [s]": ch})
