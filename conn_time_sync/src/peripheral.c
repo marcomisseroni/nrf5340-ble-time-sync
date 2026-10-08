@@ -53,10 +53,6 @@ static ssize_t time_sync_data_received(struct bt_conn *conn,
 		atomic_clear_bit(&last_timed_action_in_use, 0);
 	}
 
-	printk("Received: ");
-
-	timed_action_print(params);
-
 	return len;
 }
 
@@ -122,8 +118,8 @@ static uint64_t central_timestamp_to_local_clock(uint64_t central_timestamp_us,
 	int32_t anchor_point_time_diff_us = event_counter_diff * conn_interval_us;
 	uint64_t peripheral_time_us_at_central_anchor =
 		peripheral_anchor_us + anchor_point_time_diff_us;
-	int64_t anchor_to_timestamp = central_timestamp_us - central_anchor_us;
-
+	int64_t anchor_to_timestamp = central_timestamp_us - central_anchor_us;	// central_timestamp_us -> toggle time in central clock
+																			// central_anchor_us -> connection event time in central clock
 	return peripheral_time_us_at_central_anchor + anchor_to_timestamp;
 }
 
@@ -173,7 +169,7 @@ static bool on_vs_evt(struct net_buf_simple *buf)
 		last_timed_action.anchor_point_event_counter,
 		evt->event_counter);
 
-	if (controller_time_us + 500 < trigger_time_local) {
+	if (controller_time_us + 100 < trigger_time_local) {
 		timed_led_toggle_trigger_at(last_timed_action.led_value, trigger_time_local);
 	}
 

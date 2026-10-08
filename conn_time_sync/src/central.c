@@ -65,11 +65,18 @@ static struct {
 	struct bt_gatt_discover_params discovery_params;
 } conn_state[CONFIG_BT_MAX_CONN];
 
+static struct {
+	uint64_t central_toggle_time_us;
+	uint64_t peripheral_toggle_time_us;
+	uint8_t conn_index;
+} pending_toggle;
+
 static void send_timestamp_to_peripheral(struct bt_conn *conn, void *data)
 {
 	int err;
 	struct bt_conn_info conn_info;
-	uint64_t toggle_time_us = *(uint64_t *)data;
+	(void)data;
+	uint64_t toggle_time_us = pending_toggle.peripheral_toggle_time_us;
 
 	err = bt_conn_get_info(conn, &conn_info);
 	if (err) {
@@ -100,6 +107,11 @@ static void send_timestamp_to_peripheral(struct bt_conn *conn, void *data)
 
 	atomic_clear_bit(&conn_state[conn_index].last_anchor_point_in_use, 0);
 
+	//printk("Sending toggle time to peripheral\n");
+	//printk("Current time: %lld\n", controller_time_us_get());
+	//printk("Scheduled toggle: %lld\n", pending_toggle.peripheral_toggle_time_us);
+	//printk("Last anchor point %lld\n", conn_state[pending_toggle.conn_index].last_anchor_point_timestamp);
+
 	err = bt_gatt_write_without_response(conn,
 		conn_state[conn_index].timed_action_char_handle,
 		&conn_state[conn_index].timed_action_msg,
@@ -107,24 +119,24 @@ static void send_timestamp_to_peripheral(struct bt_conn *conn, void *data)
 		false);
 	if (err) {
 		printk("Failed writing to characteristic\n");
-	} else {
-		printk("Sent to conn index %d: ", conn_index);
-		timed_action_print(&conn_state[conn_index].timed_action_msg);
 	}
 }
 
 static void on_timestamp_send_timeout(struct k_work *work)
 {
-	uint64_t local_time_us = controller_time_us_get();
-	uint64_t toggle_time_us = local_time_us + LED_TOGGLE_TIME_OFFSET_US;
+	if (atomic_test_and_set_bit(&conn_state[pending_toggle.conn_index].last_anchor_point_in_use, 0)) {
+		return;
+	}
+	pending_toggle.peripheral_toggle_time_us = conn_state[pending_toggle.conn_index].last_anchor_point_timestamp + 2 * CONN_INTERVAL_US;	
+	pending_toggle.central_toggle_time_us = conn_state[pending_toggle.conn_index].last_anchor_point_timestamp + CONN_INTERVAL_US;
+
+	atomic_clear_bit(&conn_state[pending_toggle.conn_index].last_anchor_point_in_use, 0);
 
 	led_value = !led_value;
 
-	timed_led_toggle_trigger_at(led_value, toggle_time_us);
+	timed_led_toggle_trigger_at(led_value, pending_toggle.central_toggle_time_us);
 
-	bt_conn_foreach(BT_CONN_TYPE_LE, send_timestamp_to_peripheral, &toggle_time_us);
-
-	k_work_schedule(k_work_delayable_from_work(work), K_MSEC(LED_TOGGLE_PERIOD_MS));
+	bt_conn_foreach(BT_CONN_TYPE_LE, send_timestamp_to_peripheral, NULL);
 }
 
 K_WORK_DELAYABLE_DEFINE(timestamp_send_work, on_timestamp_send_timeout);
@@ -329,6 +341,10 @@ static bool on_vs_evt(struct net_buf_simple *buf)
 	conn_state[conn_index].last_anchor_point_event_counter = evt->event_counter;
 
 	atomic_clear_bit(&conn_state[conn_index].last_anchor_point_in_use, 0);
+
+	pending_toggle.conn_index = conn_index;
+
+	k_work_schedule(&timestamp_send_work, K_NO_WAIT);
 
 	return true;
 }
