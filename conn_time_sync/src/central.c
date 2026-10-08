@@ -107,11 +107,6 @@ static void send_timestamp_to_peripheral(struct bt_conn *conn, void *data)
 
 	atomic_clear_bit(&conn_state[conn_index].last_anchor_point_in_use, 0);
 
-	//printk("Sending toggle time to peripheral\n");
-	//printk("Current time: %lld\n", controller_time_us_get());
-	//printk("Scheduled toggle: %lld\n", pending_toggle.peripheral_toggle_time_us);
-	//printk("Last anchor point %lld\n", conn_state[pending_toggle.conn_index].last_anchor_point_timestamp);
-
 	err = bt_gatt_write_without_response(conn,
 		conn_state[conn_index].timed_action_char_handle,
 		&conn_state[conn_index].timed_action_msg,
