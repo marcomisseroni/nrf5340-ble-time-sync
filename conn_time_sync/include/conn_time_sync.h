@@ -50,7 +50,7 @@
  * The first 8 bytes hold a counter, the rest is padding.
  */
 #ifndef DATA_SIZE
-#define DATA_SIZE 12
+#define DATA_SIZE 512
 #endif
 BUILD_ASSERT(DATA_SIZE >= sizeof(uint64_t), "DATA_SIZE must hold the 8-byte counter");
 
