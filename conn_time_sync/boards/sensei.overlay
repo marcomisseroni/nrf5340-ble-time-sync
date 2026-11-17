@@ -1,8 +1,8 @@
 // LED: update port and pin from schematic
-&led0 {
+&led1 {
 	gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
 };
 
 &gpio_fwd {
 	status = "disabled";
-}
+};
