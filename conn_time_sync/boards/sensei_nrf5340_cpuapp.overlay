@@ -1,0 +1,23 @@
+// LED: update port and pin from schematic
+&led1 {
+	gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+};
+
+&gpio_fwd {
+	status = "disabled";
+};
+
+/ {
+	rtt0: rtt-access {
+		compatible = "segger,rtt-uart";	
+		status = "okay";
+	};
+	chosen {
+		zephyr,console = &rtt0;
+	};
+};
+
+
+
+
+

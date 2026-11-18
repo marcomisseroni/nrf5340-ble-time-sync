@@ -20,7 +20,7 @@ west() {
 MAX_N=3200
 N_SIM=10
 INC=$(( MAX_N / N_SIM ))
-DURATION=800
+DURATION=600
 source ble_sync_measurements/venv/bin/activate
 
 echo "*************************** STARTING LOGIC ANALYZER SOFTWARE  ***************************"
@@ -53,7 +53,7 @@ for (( i=INC; i<=MAX_N; i+=INC )); do
     cd ../ble_sync_measurements/experiments
     sleep 5
     python3 ../capture.py --duration $DURATION
-    (( DURATION += INC ))
+    (( DURATION += INC / 2 ))
     OUT=$(ls -dt output-*/ | head -1)
     python3 ../analyze.py $OUT $i
     cd ../../conn_time_sync
