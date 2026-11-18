@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/kernel.h>
-#include <zephyr/console/console.h>
+#include <SEGGER_RTT.h>
 #include "conn_time_sync.h"
 
 int main(void)
@@ -13,12 +13,11 @@ int main(void)
 	char role;
 
 	printk("Starting connection time sync sample.\n");
-	console_init();
+	printk("Choose device role - type c (central) or p (peripheral): ");
 
 	do {
-		printk("Choose device role - type c (central) or p (peripheral): ");
 
-		role = console_getchar();
+		role = SEGGER_RTT_GetKey();
 
 		switch (role) {
 		case 'p':
@@ -30,7 +29,7 @@ int main(void)
 			central_start();
 			break;
 		default:
-			printk("\n");
+			k_msleep(100);
 			break;
 		}
 	} while (role != 'c' && role != 'p');
