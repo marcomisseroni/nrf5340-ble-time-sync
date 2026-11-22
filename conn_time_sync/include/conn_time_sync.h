@@ -54,6 +54,9 @@ struct timed_action {
 	uint64_t anchor_point_us_central_clock;
 	uint16_t anchor_point_event_counter;
 	uint64_t trigger_time_us_central_clock;
+	uint64_t start_rec_time_us_central_clock;
+	uint16_t rec_duration_s;
+	bool start_rec_time_available;
 	bool led_value;
 } __packed;
 
@@ -105,6 +108,12 @@ int timed_led_toggle_init(void);
  *                     The time is specified in controller clock units.
  */
 void timed_led_toggle_trigger_at(uint8_t value, uint32_t timestamp_us);
+
+/** @brief Records data from LSM6DSV16BXTR and store them into the RAM.
+ *
+ * @param rec_duration Time duration of the recording.
+ */
+void dataset_rec(uint64_t rec_duration_s);
 
 #endif
 

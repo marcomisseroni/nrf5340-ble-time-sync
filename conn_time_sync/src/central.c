@@ -49,6 +49,10 @@
 
 #define ADV_NAME_STR_MAX_LEN (sizeof(CONFIG_BT_DEVICE_NAME))
 
+// Countdown time to start the dataset collection and duration of the dataset collection
+#define COUNTDOWN_TIME_MS 15000
+#define REC_DURATION_S 20 
+
 static void scan_start(void);
 
 static bool led_value;
@@ -127,7 +131,14 @@ static void on_timestamp_send_timeout(struct k_work *work)
 	k_work_schedule(k_work_delayable_from_work(work), K_MSEC(LED_TOGGLE_PERIOD_MS));
 }
 
+static void dataset_rec_work(struct k_work *work)
+{
+	(void)work;
+	dataset_rec(REC_DURATION_S);
+}
+
 K_WORK_DELAYABLE_DEFINE(timestamp_send_work, on_timestamp_send_timeout);
+K_WORK_DELAYABLE_DEFINE(start_dataset_recording, dataset_rec_work);
 
 static bool adv_data_parse_cb(struct bt_data *data, void *user_data)
 {
@@ -251,6 +262,13 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	if (conn_count < CONFIG_BT_MAX_CONN - peripheral_conn_count) {
 		scan_start();
 	}
+
+	// Calculate when the recording will start and schedule a work
+	k_work_schedule(&start_dataset_recording, K_MSEC(COUNTDOWN_TIME_MS));
+	uint64_t begin_dataset_rec_time = controller_time_us_get() + COUNTDOWN_TIME_MS * 1000;
+	conn_state[0].timed_action_msg.start_rec_time_us_central_clock = begin_dataset_rec_time;
+	conn_state[0].timed_action_msg.rec_duration_s = REC_DURATION_S;
+	conn_state[0].timed_action_msg.start_rec_time_available = true;
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -268,9 +286,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	/* Reset state */
 	memset(&conn_state[conn_index], 0, sizeof(conn_state[0]));
 
-	const uint8_t peripheral_conn_count = 1;
-
-	if (conn_count == CONFIG_BT_MAX_CONN - peripheral_conn_count - 1) {
+	if (conn_count == 0) {
 		scan_start();
 	}
 }
@@ -362,6 +378,8 @@ void central_start(void)
 	timed_led_toggle_init();
 
 	bt_conn_cb_register(&conn_callbacks);
+	
+	conn_state[0].timed_action_msg.start_rec_time_available = false;
 
 	scan_start();
 
