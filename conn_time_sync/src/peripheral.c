@@ -23,6 +23,8 @@ static const struct bt_data ad[] = {
 
 static atomic_t last_timed_action_in_use;
 static struct timed_action last_timed_action;
+static bool dataset_rec_set = false;
+static uint64_t rec_duration_s;
 
 static uint32_t conn_interval_us_get(const struct bt_conn *conn)
 {
@@ -34,6 +36,14 @@ static uint32_t conn_interval_us_get(const struct bt_conn *conn)
 
 	return info.le.interval_us;
 }
+
+static void dataset_rec_work(struct k_work *work)
+{
+	(void)work;
+	dataset_rec(rec_duration_s);
+}
+
+K_WORK_DELAYABLE_DEFINE(start_dataset_recording, dataset_rec_work);
 
 static ssize_t time_sync_data_received(struct bt_conn *conn,
 					     const struct bt_gatt_attr *attr,
@@ -175,6 +185,24 @@ static bool on_vs_evt(struct net_buf_simple *buf)
 
 	if (controller_time_us + 500 < trigger_time_local) {
 		timed_led_toggle_trigger_at(last_timed_action.led_value, trigger_time_local);
+	}
+	
+	if(last_timed_action.start_rec_time_available && !dataset_rec_set) {
+		uint64_t begin_dataset_rec_time = central_timestamp_to_local_clock(
+			last_timed_action.start_rec_time_us_central_clock,
+			conn_interval_us,
+			last_timed_action.anchor_point_us_central_clock,
+			evt->anchor_point_us,
+			last_timed_action.anchor_point_event_counter,
+			evt->event_counter);
+		rec_duration_s = last_timed_action.rec_duration_s;
+		if(begin_dataset_rec_time < controller_time_us_get()) {
+			printk("Error: dataset recording should have started in the past\n");
+		}
+		else {
+			k_work_schedule(&start_dataset_recording, K_MSEC((begin_dataset_rec_time - controller_time_us_get()) / 1000));
+			dataset_rec_set = true;
+		}
 	}
 
 	atomic_clear_bit(&last_timed_action_in_use, 0);

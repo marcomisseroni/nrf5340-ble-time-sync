@@ -55,7 +55,7 @@ struct timed_action {
 	uint16_t anchor_point_event_counter;
 	uint64_t trigger_time_us_central_clock;
 	uint64_t start_rec_time_us_central_clock;
-	uint16_t rec_duration_s;
+	uint64_t rec_duration_s;
 	bool start_rec_time_available;
 	bool led_value;
 } __packed;
