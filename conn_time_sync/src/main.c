@@ -11,7 +11,7 @@
 int main(void)
 {
 	char role;
-
+	imu_init();
 	printk("Starting connection time sync sample.\n");
 	printk("Choose device role - type c (central) or p (peripheral): ");
 

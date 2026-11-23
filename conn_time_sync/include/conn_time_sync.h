@@ -109,11 +109,21 @@ int timed_led_toggle_init(void);
  */
 void timed_led_toggle_trigger_at(uint8_t value, uint32_t timestamp_us);
 
-/** @brief Records data from LSM6DSV16BXTR and store them into the RAM.
+/** @brief Initialize the work queue that runs the dataset recording.
  *
- * @param rec_duration Time duration of the recording.
+ * Must be called before dataset_rec_schedule(), in both roles.
  */
-void dataset_rec(uint64_t rec_duration_s);
+void imu_init(void);
+
+/** @brief Schedule the recording of the LSM6DSV16BXTR data into RAM.
+ *
+ * The recording runs on the dedicated work queue started by imu_init(),
+ * so it does not block the system work queue.
+ *
+ * @param delay Delay before the recording starts.
+ * @param duration_s Duration of the recording, in seconds.
+ */
+void dataset_rec_schedule(k_timeout_t delay, uint64_t duration_s);
 
 #endif
 
