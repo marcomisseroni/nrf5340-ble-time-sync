@@ -12,7 +12,7 @@
 	pinctrl-0 = <&i2c1_default>;
 	pinctrl-1 = <&i2c1_sleep>;
 	pinctrl-names = "default", "sleep";
-	//clock-frequency = ;
+	clock-frequency = <1000000>;
 
 	imu: lsm6dsv16bxtr@6a {
 		compatible = "st,lsm6dsv16x";
