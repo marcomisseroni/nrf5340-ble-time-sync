@@ -19,7 +19,7 @@
 		reg = <0x6a>;
 		accel-odr = <0x0c>;
 		//accel-range = (int), def: 2;
-		//int1-gpios = (phandle array);
+		int1-gpios = <&gpio0 23 GPIO_ACTIVE_HIGH>;
 		//drdy-pin = (1 or 2);
 		//drdy-pulsed = (bool);
 		//fifo-watermark = (int);
