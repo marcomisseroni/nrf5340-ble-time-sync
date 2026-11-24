@@ -1,8 +1,12 @@
 #include <zephyr/drivers/i2c.h>
 #include "conn_time_sync.h"
 
-#define WHO_AM_I_REG 15
 #define WHO_AM_I_EXP_CONTENT 113
+#define WHO_AM_I_REG 15                 // hex: 0x0f
+#define CTRL1 16                        // hex: 0x10
+#define CTRL3 18                        // hex: 0x12
+#define CTRL8 23                        // hex: 0x17
+#define OUTZ_L_A 40                     // hex: 0x28
 
 static struct k_work_q queue;
 static uint64_t rec_duration_s;
@@ -10,14 +14,14 @@ static const struct i2c_dt_spec i2c_dev = I2C_DT_SPEC_GET(DT_NODELABEL(imu));
 
 K_THREAD_STACK_DEFINE(ds_t_stack, 2048);
 
-void imu_init(void) 
+int imu_init(void) 
 {
     k_work_queue_init(&queue);
     k_work_queue_start(&queue, ds_t_stack, K_THREAD_STACK_SIZEOF(ds_t_stack), 5, NULL);
 
     if(!device_is_ready(i2c_dev.bus)) {
         printk("I2C bus %s is not ready\n", i2c_dev.bus->name);
-        return;
+        return 1;
     }
 
     uint8_t reg_val;
@@ -25,21 +29,77 @@ void imu_init(void)
     
     if(err) {
         printk("Error in reading the WHO_AM_I register of the IMU: %d\n", err);
-        return;
+        return err;
     }
 
     if(reg_val != WHO_AM_I_EXP_CONTENT) {
         printk("Error: the value read from the WHO_AM_I register of the IMU doesn't match the expected one.\n");
         printk("Expected: %d\n", WHO_AM_I_EXP_CONTENT);
         printk("Read: 0x%02x\n", reg_val);
-        return;
+        return 1;
     }
 
-    printk("IMU successfully initialized!\n");
+    bool successful_init = true;
+    uint8_t check_val;
+    uint8_t ctrl3_val = 68;     // 68 = 01000100b
+    err = i2c_reg_write_byte_dt(&i2c_dev, CTRL3, ctrl3_val);
+    if(err) {
+        printk("Error writing the register CTRL3: 0x%02x. Error: %d\n", CTRL3, err);
+        return err;
+    }
+    err = i2c_reg_read_byte_dt(&i2c_dev, CTRL3, &check_val);
+    if(err) {
+        printk("Error reading the register CTRL3: 0x%02x. Error: %d\n", CTRL3, err);
+        return err;
+    }
+    if(check_val != ctrl3_val) {
+        printk("The value of register CTRL3: 0x%02x is different from the one set. Set: %d, Read: %d\n", CTRL3, ctrl3_val, check_val);
+        successful_init = false;
+    }
+
+    uint8_t ctrl8_val = 0;   // 0 = ---00000b
+    err = i2c_reg_write_byte_dt(&i2c_dev, CTRL8, ctrl8_val);
+    if(err) {
+        printk("Error writing the register CTRL8: 0x%02x. Error: %d\n", CTRL8, err);
+        return err;
+    }
+    err = i2c_reg_read_byte_dt(&i2c_dev, CTRL8, &check_val);
+    if(err) {
+        printk("Error reading the register CTRL8: 0x%02x. Error: %d\n", CTRL8, err);
+        return err;
+    }
+    if(check_val != ctrl8_val) {
+        printk("The value of register CTRL8: 0x%02x is different from the one set. Set: %d, Read: %d\n", CTRL8, ctrl8_val, check_val);
+        successful_init = false;
+    }
+
+    uint8_t ctrl1_val = 12;    // 12 = 00001100b 
+    err = i2c_reg_write_byte_dt(&i2c_dev, CTRL1, ctrl1_val);
+    if(err) {
+        printk("Error writing the register CTRL1: 0x%02x. Error: %d\n", CTRL1, err);
+        return err;
+    }
+    err = i2c_reg_read_byte_dt(&i2c_dev, CTRL1, &check_val);
+    if(err) {
+        printk("Error reading the register CTRL1: 0x%02x. Error: %d\n", CTRL1, err);
+        return err;
+    }
+    if(check_val != ctrl1_val) {
+        printk("The value of register CTRL1: 0x%02x is different from the one set. Set: %d, Read: %d\n", CTRL1, ctrl1_val, check_val);
+        successful_init = false;
+    }
+
+    if(successful_init) {
+        printk("IMU successfully initialized!\n");
+    }
+    return !successful_init;
 }
 
 static void dataset_rec(uint64_t rec_duration) 
 {
+    uint8_t test_acceleration;
+    int err = i2c_reg_read_byte_dt(&i2c_dev, OUTZ_L_A, &test_acceleration);
+    printk("IMU test reading out: %d", test_acceleration);
     return;
 }
 

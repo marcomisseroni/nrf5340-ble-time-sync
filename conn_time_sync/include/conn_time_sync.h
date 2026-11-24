@@ -109,11 +109,22 @@ int timed_led_toggle_init(void);
  */
 void timed_led_toggle_trigger_at(uint8_t value, uint32_t timestamp_us);
 
-/** @brief Initialize the work queue that runs the dataset recording.
+/** @brief Initialize the IMU (LSM6DSV16BXTR) and the dataset recording work queue.
+ *
+ * Starts the work queue that runs the dataset recording, checks that the I2C
+ * bus is ready and that WHO_AM_I matches, then configures the accelerometer
+ * (CTRL3: BDU and IF_INC, CTRL8: full scale, CTRL1: ODR and operating mode,
+ * written last because it powers the accelerometer on). Each written register
+ * is read back to verify its content.
  *
  * Must be called before dataset_rec_schedule(), in both roles.
+ *
+ * @return 0 on success.
+ * @return Negative error code from the I2C API if a register access fails.
+ * @return 1 if the I2C bus is not ready, WHO_AM_I does not match, or a
+ *         register read back does not match the written value.
  */
-void imu_init(void);
+int imu_init(void);
 
 /** @brief Schedule the recording of the LSM6DSV16BXTR data into RAM.
  *
