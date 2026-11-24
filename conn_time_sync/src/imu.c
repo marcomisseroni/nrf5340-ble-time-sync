@@ -97,9 +97,17 @@ int imu_init(void)
 
 static void dataset_rec(uint64_t rec_duration) 
 {
-    uint8_t test_acceleration;
-    int err = i2c_reg_read_byte_dt(&i2c_dev, OUTZ_L_A, &test_acceleration);
-    printk("IMU test reading out: %d", test_acceleration);
+    uint8_t raw[2];
+    int err = i2c_burst_read_dt(&i2c_dev, OUTZ_L_A, raw, sizeof(raw));
+    if(err) {
+        printk("Error reading the data of the IMU from 0x%02x. Error: %d\n", OUTZ_L_A, err);
+        return;
+    }
+
+    int16_t read_val = (int16_t)(raw[1] << 8 | raw[0]);
+
+    printk("Read test value from IMU: %d\n", read_val);
+
     return;
 }
 

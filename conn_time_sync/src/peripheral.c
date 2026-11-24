@@ -54,9 +54,9 @@ static ssize_t time_sync_data_received(struct bt_conn *conn,
 		atomic_clear_bit(&last_timed_action_in_use, 0);
 	}
 
-	printk("Received: ");
+	//printk("Received: ");
 
-	timed_action_print(params);
+	//timed_action_print(params);
 
 	return len;
 }

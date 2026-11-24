@@ -50,8 +50,8 @@
 #define ADV_NAME_STR_MAX_LEN (sizeof(CONFIG_BT_DEVICE_NAME))
 
 // Countdown time to start the dataset collection and duration of the dataset collection
-#define COUNTDOWN_TIME_MS 15000
-#define REC_DURATION_S 20 
+#define COUNTDOWN_TIME_MS 1500
+#define REC_DURATION_S 2 
 
 static void scan_start(void);
 
@@ -112,8 +112,8 @@ static void send_timestamp_to_peripheral(struct bt_conn *conn, void *data)
 	if (err) {
 		printk("Failed writing to characteristic\n");
 	} else {
-		printk("Sent to conn index %d: ", conn_index);
-		timed_action_print(&conn_state[conn_index].timed_action_msg);
+		//printk("Sent to conn index %d: ", conn_index);
+		//timed_action_print(&conn_state[conn_index].timed_action_msg);
 	}
 }
 

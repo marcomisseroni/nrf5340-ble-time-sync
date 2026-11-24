@@ -11,7 +11,12 @@
 int main(void)
 {
 	char role;
-	imu_init();
+	int err = imu_init();
+	if(err) {
+		printk("Error initializing the IMU.\n");
+		return 1;
+	}
+
 	printk("Starting connection time sync sample.\n");
 	printk("Choose device role - type c (central) or p (peripheral): ");
 
