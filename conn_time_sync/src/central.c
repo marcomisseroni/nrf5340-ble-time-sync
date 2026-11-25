@@ -51,7 +51,7 @@
 
 // Countdown time to start the dataset collection and duration of the dataset collection
 #define COUNTDOWN_TIME_MS 1500
-#define REC_DURATION_S 2 
+#define REC_DURATION_S 5 
 
 static void scan_start(void);
 
