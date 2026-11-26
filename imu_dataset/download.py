@@ -1,12 +1,20 @@
 import subprocess
 import numpy as np
+import os
+import matplotlib.pyplot as plt
 
 from pathlib import Path
+from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent.parent
 ELF_FILE_PATH = ROOT / "conn_time_sync" / "build" / "conn_time_sync" / "zephyr" / "zephyr.elf"
 OUTPUT_DIR = ROOT / "imu_dataset" / "data"
 NM_PATH = Path("/home/m4rch0/ncs/toolchains/8285d8ad56/opt/zephyr-sdk/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-nm")
+
+SHOW_PLOTS = True
+
+ODR_HZ = 7680               # must match ODR_HZ in conn_time_sync/src/imu.c
+SENSITIVITY_G_PER_LSB = 0.061e-3   # LSM6DSV16BX at +-2 g (datasheet: 0.061 mg/LSB)
 
 def read_board_id() -> str:
     """
@@ -65,6 +73,40 @@ def read_memory(board_id: str, addr: int, n_byte: int, width: int) -> list:
             words.append(int(field, 16))
     return words
 
+def save_data(data: np.ndarray, board_id: str) -> None:
+    """
+    Save the data in OUT_DIR.
+    """
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_{board_id}.npy"
+    path = OUTPUT_DIR / filename
+    np.save(path, data)
+
+def plots(data: np.ndarray) -> None:
+    """
+    Simple plot to check the data: Z acceleration over time and histogram of the values.
+    data is the raw int16 array (LSB), converted to g only for plotting.
+    """
+    z_g = data * SENSITIVITY_G_PER_LSB
+    t = np.arange(len(data)) / ODR_HZ   # samples are equally spaced at ODR_HZ
+
+    fig, (ax_time, ax_hist) = plt.subplots(2, 1, figsize=(10, 7))
+
+    ax_time.plot(t, z_g, linewidth=0.5)
+    ax_time.set_xlabel("time [s]")
+    ax_time.set_ylabel("acc Z [g]")
+    ax_time.set_title(f"{len(data)} samples, {len(data) / ODR_HZ:.2f} s @ {ODR_HZ} Hz")
+    ax_time.grid(True)
+
+    ax_hist.hist(z_g, bins=100)
+    ax_hist.set_xlabel("acc Z [g]")
+    ax_hist.set_ylabel("count")
+    ax_hist.set_title(f"mean = {z_g.mean():.4f} g, std = {z_g.std() * 1e3:.2f} mg")
+    ax_hist.grid(True)
+
+    fig.tight_layout()
+    plt.show()
+
 def main():
     board_id = read_board_id()
     rec_buf_add, rec_buf_dim, saved_samples_add = find_symbols()
@@ -83,7 +125,10 @@ def main():
         raise RuntimeError(f"Error: unexpected length of rec_buf. Expected: {saved_samples[0]}, got: {len(rec_buf)}")
     
     rec_buf = np.array(rec_buf, dtype=np.uint16).view(np.int16)
+    save_data(rec_buf, board_id)
 
+    if(SHOW_PLOTS):
+        plots(rec_buf)
 
 if __name__ == "__main__":
     main()

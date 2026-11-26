@@ -12,3 +12,9 @@ experiments
 
 # Logs
 log.txt
+
+# Recorded data
+imu_dataset/data/
+
+#pycache
+__pycache__/
