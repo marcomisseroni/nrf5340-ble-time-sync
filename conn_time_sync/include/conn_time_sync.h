@@ -95,6 +95,61 @@ void controller_time_trigger_offset_ns_set(int32_t offset_ns);
  */
 uint32_t controller_time_trigger_event_addr_get(void);
 
+/** @brief Get the address of the task that captures the RTC0 counter.
+ *
+ * Connect an event to this task (e.g. with nrfx_gppi) to latch the RTC0
+ * counter into capture channel 1 at the moment the event happens.
+ * Use together with controller_time_capture_timer_task_addr_get() on the
+ * same event, so that RTC0 and TIMER0 are captured at the same instant.
+ *
+ * Only implemented for the nRF5340 application core (controller_time_nrf53_app.c).
+ *
+ * @return The address of the RTC0 CAPTURE[1] task.
+ */
+uint32_t controller_time_capture_rtc_task_addr_get(void);
+
+/** @brief Get the address of the task that captures the TIMER0 counter.
+ *
+ * TIMER0 runs at 16 MHz and is cleared on every RTC0 tick, so the captured
+ * value is the sub-tick part of the timestamp (0 to about 488 counts).
+ *
+ * Only implemented for the nRF5340 application core (controller_time_nrf53_app.c).
+ *
+ * @return The address of the TIMER0 CAPTURE[1] task.
+ */
+uint32_t controller_time_capture_timer_task_addr_get(void);
+
+/** @brief Read the raw values latched by the last capture.
+ *
+ * Returns the values as they are in the capture registers, without
+ * conversion to time and without the RTC overflow count. A new capture
+ * overwrites them, so read them before the next event.
+ *
+ * Only implemented for the nRF5340 application core (controller_time_nrf53_app.c).
+ *
+ * @param rtc_ticks    Output: RTC0 counter (32768 Hz ticks, 24 bit).
+ * @param timer_counts Output: TIMER0 counter (16 MHz counts since the last RTC0 tick).
+ */
+void controller_time_capture_get(uint32_t *rtc_ticks, uint32_t *timer_counts);
+
+/** @brief Get the controller time of the last capture, in nanoseconds.
+ *
+ * Combines the RTC0 and TIMER0 values latched by the last capture event
+ * (e.g. an IMU INT1 pulse) with the RTC overflow count, so the result is the
+ * full controller time at which the event happened, with sub-µs resolution
+ * (TIMER0 step: 62.5 ns). This is not the current time: for that use
+ * controller_time_us_get().
+ *
+ * If the RTC overflowed between the capture and this call, the capture is
+ * assigned to the previous overflow period. Call it within a few ms of the
+ * event (well before the next capture and much less than the 512 s RTC period).
+ *
+ * Only implemented for the nRF5340 application core (controller_time_nrf53_app.c).
+ *
+ * @return Controller time of the last capture, in ns.
+ */
+uint64_t controller_time_capture_ns_get(void);
+
 /** @brief Initialize the module handling timed toggling of an LED.
  *
  * @return 0 on success, failure otherwise.
@@ -135,6 +190,17 @@ int imu_init(void);
  * @param duration_s Duration of the recording, in seconds.
  */
 void dataset_rec_schedule(k_timeout_t delay, uint64_t duration_s);
+
+/** @brief Convert a local controller time to the central controller time.
+ *
+ * On the peripheral, subtracts the offset (local - central) computed at the
+ * last connection anchor point from the last timed_action received. On the
+ * central the offset stays 0, so the time is returned unchanged.
+ *
+ * @param local_ns Local controller time, in ns.
+ * @return The same instant in the central controller time, in ns.
+ */
+uint64_t local_to_central_ns(uint64_t local_ns);
 
 #endif
 

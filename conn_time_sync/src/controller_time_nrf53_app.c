@@ -326,6 +326,61 @@ uint32_t controller_time_trigger_event_addr_get(void)
 	return nrf_egu_event_address_get(NRF_EGU0, NRF_EGU_EVENT_TRIGGERED0);
 }
 
+/* Capture channel used for timestamping external events (e.g. IMU INT1).
+ * Channel 0 of both RTC0 and TIMER0 is already used as compare by the trigger.
+ */
+#define CAPTURE_CHANNEL 1
+
+uint32_t controller_time_capture_rtc_task_addr_get(void)
+{
+	return nrfx_rtc_task_address_get(&app_rtc_instance, nrf_rtc_capture_task_get(CAPTURE_CHANNEL));
+}
+
+uint32_t controller_time_capture_timer_task_addr_get(void)
+{
+	return nrfx_timer_capture_task_address_get(&app_timer_instance, (nrf_timer_cc_channel_t)CAPTURE_CHANNEL);
+}
+
+void controller_time_capture_get(uint32_t *rtc_ticks, uint32_t *timer_counts)
+{
+	*rtc_ticks = nrf_rtc_cc_get(app_rtc_instance.p_reg, CAPTURE_CHANNEL);
+	*timer_counts = nrfx_timer_capture_get(&app_timer_instance, (nrf_timer_cc_channel_t)CAPTURE_CHANNEL);
+}
+
+uint64_t controller_time_capture_ns_get(void) 
+{
+	uint32_t rtc_ticks;
+	uint32_t timer_counts;
+	uint32_t ov;
+	uint32_t now1;
+	uint32_t now2;
+	controller_time_capture_get(&rtc_ticks, &timer_counts);
+	
+	now1 = nrf_rtc_counter_get(app_rtc_instance.p_reg);
+	ov = num_rtc_overflows;
+	now2 = nrf_rtc_counter_get(app_rtc_instance.p_reg);
+	barrier_isync_fence_full();
+
+	// Protection against overflow between reading now1 and now2
+	if(now1 > now2) {
+		ov = num_rtc_overflows;
+	}
+	// Protection against overflow between the hw interrupt (PPI) and reading the now2 variable
+	if (rtc_ticks > now2) {
+		ov--;
+	}
+
+	/* Full controller time in ns, integer math only:
+	 * - one RTC overflow period = 2^24 ticks = 512 s = 512000000000 ns;
+	 * - one RTC tick = 10^9 / 32768 ns = 30517578125 fs, divided by 10^6 to get ns;
+	 * - one TIMER0 count at 16 MHz = 62.5 ns = 125 / 2 ns.
+	 * Each term is cast to 64 bit before the multiplication to avoid overflow.
+	 */
+	return (uint64_t)ov * 512000000000ULL
+	       + (uint64_t)rtc_ticks * 30517578125ULL / 1000000ULL
+	       + (uint64_t)timer_counts * 125ULL / 2ULL;
+}
+
 /* The controller time initialization must happen before
  * starting the network core.
  */

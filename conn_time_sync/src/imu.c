@@ -1,6 +1,9 @@
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/gpio.h>
 #include "conn_time_sync.h"
+#include <nrfx_gpiote.h>
+#include <gpiote_nrfx.h>
+#include <helpers/nrfx_gppi.h>
 
 #define WHO_AM_I_EXP_CONTENT 113
 #define WHO_AM_I_REG 15                 // hex: 0x0f
@@ -25,6 +28,14 @@
 #define BUF_DIM (BUF_WORDS * BYTE_PER_WORD)
 #define ODR_HZ 7680
 #define REC_SAMPLES (5 * ODR_HZ)
+#define MARGIN 10 // Margin to add to REC_TS_DIM
+#define REC_TS_DIM (REC_SAMPLES / 128 + MARGIN) // We get 1 timestamp every time the interrupt on INT1 is raised, so one every 128 sample (set in the registres)
+
+/* GPIOTE instance that handles the INT1 pin, and INT1 as absolute pin number
+ * (port * 32 + pin) as nrfx wants it. Both are taken from the devicetree.
+ */
+#define INT1_GPIOTE_NODE NRF_DT_GPIOTE_NODE(DT_NODELABEL(imu), int1_gpios)
+#define INT1_PIN NRF_DT_GPIOS_TO_PSEL(DT_NODELABEL(imu), int1_gpios)
 
 static struct k_work_q queue;
 static uint64_t rec_duration_s;
@@ -35,13 +46,18 @@ static uint8_t buf[BUF_DIM];
 static uint32_t saved_samples;
 static uint32_t tot_samples_to_save; 
 volatile int16_t rec_buf[REC_SAMPLES];
+volatile uint64_t rec_ts[REC_TS_DIM];
+volatile uint32_t saved_ts;
 
 K_THREAD_STACK_DEFINE(ds_t_stack, 2048);
 
 static void read_fifo(struct k_work *work) {
-    if(saved_samples >= tot_samples_to_save) {
-        return;
+    if(saved_samples >= tot_samples_to_save) return;
+
+    if(saved_ts < REC_TS_DIM) {
+        rec_ts[saved_ts++] = local_to_central_ns(controller_time_capture_ns_get());
     }
+
     uint8_t fifo_status[2];
     int err = i2c_burst_read_dt(&i2c_dev, FIFO_STATUS1, fifo_status, sizeof(fifo_status));
     if(err) {
@@ -122,18 +138,94 @@ static int set_and_check_reg(uint8_t reg_add, uint8_t val_to_set) {
     return 0;
 }
 
-int imu_init(void) 
+/* Connect the INT1 pin to the RTC0/TIMER0 capture tasks through DPPI, so that
+ * every INT1 rising edge latches the controller time in hardware (no CPU, no
+ * interrupt latency):
+ *
+ *   GPIOTE IN event (INT1) --DPPI--> RTC0 CAPTURE[1]
+ *                               \--> TIMER0 CAPTURE[1]
+ *
+ * NOTE: the GPIOTE channel of INT1 is owned by the Zephyr GPIO driver, not by
+ * this file. The driver allocates it the first time the edge interrupt is
+ * enabled, so the interrupt is enabled here once, the channel is looked up
+ * with nrfx and the DPPI connection is attached to its IN event. This works
+ * because in NCS 3.4.1 (zephyr/drivers/gpio/gpio_nrfx.c) GPIO_INT_DISABLE only
+ * disables the trigger and does not free the channel, and re-enabling reuses
+ * the same channel. While the interrupt is disabled the IN event is disabled
+ * too, so captures only happen during a recording.
+ * Requirement: INT1 must not be in the gpio0 "sense-edge-mask", otherwise the
+ * driver uses PORT/SENSE and there is no per-pin IN event.
+ *
+ * Must be called before CTRL1 starts the accelerometer, so that no INT1 pulse
+ * arrives while the connection is being set up.
+ */
+static int connect_int1_to_capture(void)
+{
+    nrfx_gpiote_t *gpiote = &GPIOTE_NRFX_INST_BY_NODE(INT1_GPIOTE_NODE);
+    nrfx_gppi_handle_t int1_capture_ppi;
+    uint8_t ch;
+
+    /* 1. Let the GPIO driver allocate a GPIOTE channel for INT1. */
+    int err = gpio_pin_interrupt_configure_dt(&int1_gpio, GPIO_INT_EDGE_RISING);
+    if(err) {
+        printk("Error enabling the interrupt on pin %d. Error: %d\n", int1_gpio.pin, err);
+        return err;
+    }
+
+    /* 2. Check that the driver really used a GPIOTE channel (IN event), not SENSE. */
+    err = nrfx_gpiote_channel_get(gpiote, INT1_PIN, &ch);
+    if(err) {
+        printk("INT1 has no GPIOTE channel (sense mode?), cannot capture. Error: %d\n", err);
+        return err;
+    }
+
+    uint32_t int1_evt = nrfx_gpiote_in_event_address_get(gpiote, INT1_PIN);
+
+    /* 3. INT1 IN event -> RTC0 capture. */
+    err = nrfx_gppi_conn_alloc(int1_evt, controller_time_capture_rtc_task_addr_get(), &int1_capture_ppi);
+    if(err) {
+        printk("Error allocating the DPPI connection INT1 -> RTC capture. Error: %d\n", err);
+        return err;
+    }
+
+    /* 4. Same connection -> TIMER0 capture, so both are latched at the same instant. */
+    err = nrfx_gppi_ep_attach(controller_time_capture_timer_task_addr_get(), int1_capture_ppi);
+    if(err) {
+        printk("Error attaching TIMER capture to the INT1 DPPI connection. Error: %d\n", err);
+        return err;
+    }
+
+    /* 5. Activate the connection. */
+    nrfx_gppi_conn_enable(int1_capture_ppi);
+
+    /* 6. Disable the interrupt again: dataset_rec() enables it when a recording starts.
+     * The channel and the DPPI connection stay in place.
+     */
+    err = gpio_pin_interrupt_configure_dt(&int1_gpio, GPIO_INT_DISABLE);
+    if(err) {
+        printk("Error disabling the interrupt on pin %d. Error: %d\n", int1_gpio.pin, err);
+        return err;
+    }
+
+    printk("INT1 (GPIOTE ch %u) connected to RTC0/TIMER0 capture\n", ch);
+    return 0;
+}
+
+int imu_init(void)
 {
     k_work_queue_init(&queue);
     k_work_queue_start(&queue, ds_t_stack, K_THREAD_STACK_SIZEOF(ds_t_stack), 5, NULL);
-
+    
     if(!device_is_ready(i2c_dev.bus)) {
         printk("I2C bus %s is not ready\n", i2c_dev.bus->name);
         return 1;
     }
+  
+    int err = i2c_recover_bus(i2c_dev.bus);
+    if(err) printk("Error recovering i2c bus\n");
 
     uint8_t reg_val;
-    int err = i2c_reg_read_byte_dt(&i2c_dev, WHO_AM_I_REG, &reg_val);
+    err = i2c_reg_read_byte_dt(&i2c_dev, WHO_AM_I_REG, &reg_val);
     
     if(err) {
         printk("Error in reading the WHO_AM_I register of the IMU: %d\n", err);
@@ -164,6 +256,11 @@ int imu_init(void)
     if(err) {
         printk("Error adding the callback to the callbacks list\n");
         printk("Error: %d\n", err);
+        return err;
+    }
+
+    err = connect_int1_to_capture();
+    if(err) {
         return err;
     }
 
@@ -240,6 +337,7 @@ int imu_init(void)
 static void dataset_rec(uint64_t duration) 
 {
     saved_samples = 0;
+    saved_ts = 0;
     uint64_t samples_to_save = duration * ODR_HZ;
     if(samples_to_save > REC_SAMPLES) {
         printk("The duration of the recording is too long\n");

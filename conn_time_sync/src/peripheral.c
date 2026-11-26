@@ -24,6 +24,8 @@ static const struct bt_data ad[] = {
 static atomic_t last_timed_action_in_use;
 static struct timed_action last_timed_action;
 static bool dataset_rec_set = false;
+static int64_t offset_us;
+static struct k_spinlock offset_lock;
 
 static uint32_t conn_interval_us_get(const struct bt_conn *conn)
 {
@@ -119,7 +121,7 @@ static uint64_t central_timestamp_to_local_clock(uint64_t central_timestamp_us,
 						 uint16_t central_event_count,
 						 uint16_t peripheral_event_count)
 {
-	int32_t event_counter_diff = central_event_count - peripheral_event_count;
+	int32_t event_counter_diff = (int16_t)(central_event_count - peripheral_event_count);
 	int32_t anchor_point_time_diff_us = event_counter_diff * conn_interval_us;
 	uint64_t peripheral_time_us_at_central_anchor =
 		peripheral_anchor_us + anchor_point_time_diff_us;
@@ -165,6 +167,18 @@ static bool on_vs_evt(struct net_buf_simple *buf)
 	}
 
 	uint64_t controller_time_us = controller_time_us_get();
+
+	uint64_t local_at_central_anchor = central_timestamp_to_local_clock(
+		last_timed_action.anchor_point_us_central_clock,
+		conn_interval_us,
+		last_timed_action.anchor_point_us_central_clock,
+		evt->anchor_point_us,
+		last_timed_action.anchor_point_event_counter,
+		evt->event_counter);
+
+	k_spinlock_key_t key = k_spin_lock(&offset_lock);
+	offset_us = (int64_t)local_at_central_anchor - (int64_t)last_timed_action.anchor_point_us_central_clock;
+	k_spin_unlock(&offset_lock, key);
 
 	uint64_t trigger_time_local = central_timestamp_to_local_clock(
 		last_timed_action.trigger_time_us_central_clock,
@@ -234,4 +248,13 @@ void peripheral_start(void)
 	bt_conn_cb_register(&conn_callbacks);
 
 	adv_start();
+}
+
+uint64_t local_to_central_ns(uint64_t local_ns)
+{
+	k_spinlock_key_t key = k_spin_lock(&offset_lock);
+	int64_t off = offset_us;
+	k_spin_unlock(&offset_lock, key);
+
+	return local_ns - off * 1000;
 }
