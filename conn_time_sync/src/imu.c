@@ -89,7 +89,7 @@ static void read_fifo(struct k_work *work) {
         if(saved_samples >= tot_samples_to_save) {
             err = gpio_pin_interrupt_configure_dt(&int1_gpio, GPIO_INT_DISABLE);
             if(err) printk("Failed to disable the interrupt on pin %d. Error: %d\n", int1_gpio.pin, err);
-            printk("Recording completed.\n");
+            printk("-------------------------------Recording completed-------------------------------\n");
             printk("Recorded samples: %u\n", saved_samples);
             return;
         }
@@ -260,6 +260,7 @@ static void dataset_rec(uint64_t duration)
         return;
     }
 
+    printk("-------------------------------Starting the recording-------------------------------\n");
     err = gpio_pin_interrupt_configure_dt(&int1_gpio, GPIO_INT_EDGE_RISING);
     if(err) {
         printk("Error in configuring the interrupt on pin: %d\n", int1_gpio.pin);
