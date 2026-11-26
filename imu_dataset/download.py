@@ -169,13 +169,13 @@ def main():
         raise RuntimeError(f"Error: unexpected length of saved_samples. Expected: 1, got: {len(saved_samples)}")
     if(saved_samples[0] == 0):
         raise RuntimeError("Error: no recording in RAM, the board has been reset")
-    if(saved_samples[0] * 2 > syms["rec_buf_dim"]): # saved_samples is the number of samples, each sample's size is 2B
-        raise RuntimeError(f"Error: dimensions do not match. Byte saved: {2 * saved_samples[0]}, rec_buf size: {syms["rec_buf_dim"]}")
+    if(saved_samples[0] * 6 > syms["rec_buf_dim"]): # saved_samples is the number of samples, each sample's size is 2B * 3 axis
+        raise RuntimeError(f"Error: dimensions do not match. Byte saved: {6 * saved_samples[0]}, rec_buf size: {syms["rec_buf_dim"]}")
     
-    rec_buf = read_memory(board_id, syms["rec_buf_addr"], saved_samples[0] * 2, 16)   # 16 bit because rec_buf is int16_t
+    rec_buf = read_memory(board_id, syms["rec_buf_addr"], saved_samples[0] * 6, 16)   # 16 bit because rec_buf is int16_t
 
-    if(len(rec_buf) != saved_samples[0]):
-        raise RuntimeError(f"Error: unexpected length of rec_buf. Expected: {saved_samples[0]}, got: {len(rec_buf)}")
+    if(len(rec_buf) != saved_samples[0] * 3): # 3: 1 for each axis
+        raise RuntimeError(f"Error: unexpected length of rec_buf. Expected: {saved_samples[0] * 3}, got: {len(rec_buf)}")
 
     saved_ts = read_memory(board_id, syms["saved_ts_addr"], 4, 32)
 
@@ -195,7 +195,7 @@ def main():
     if(len(rec_ts) != saved_ts[0]):
         raise RuntimeError(f"Error: unexpected length of rec_ts. Expected: {saved_ts[0]}, got: {len(rec_ts)}")
     
-    rec_buf = np.array(rec_buf, dtype=np.uint16).view(np.int16)
+    rec_buf = np.array(rec_buf, dtype=np.uint16).view(np.int16).reshape(-1, 3)
     
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     dt = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -207,7 +207,7 @@ def main():
     np.savez(path, acc=rec_buf, timestamp=correct_tick_err(rec_ts))
 
     if(SHOW_PLOTS):
-        plots(rec_buf, rec_ts)
+        plots(rec_buf[:, 2], rec_ts)
 
 if __name__ == "__main__":
     main()

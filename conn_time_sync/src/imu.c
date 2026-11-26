@@ -45,7 +45,7 @@ static struct gpio_callback int1_cb;
 static uint8_t buf[BUF_DIM];
 static uint32_t saved_samples;
 static uint32_t tot_samples_to_save; 
-volatile int16_t rec_buf[REC_SAMPLES];
+volatile int16_t rec_buf[REC_SAMPLES * 3]; // 3 is for 3 axis
 volatile uint64_t rec_ts[REC_TS_DIM];
 volatile uint32_t saved_ts;
 
@@ -92,7 +92,7 @@ static void read_fifo(struct k_work *work) {
     uint8_t acc_nc = 2; // hex: 0x02 -> accelerometer NC (non compressed), new accelerometer data
     uint8_t fifo_data_out1;
     uint8_t fifo_data_out2;
-    int16_t acc_z;
+    int16_t acc_x, acc_y, acc_z;
     for(int i = 0; i < diff_fifo; ++i) {
         tag = buf[i * BYTE_PER_WORD];
         if((tag >> 3) != acc_nc) {
@@ -101,7 +101,18 @@ static void read_fifo(struct k_work *work) {
         fifo_data_out1 = buf[i * BYTE_PER_WORD + 1];
         fifo_data_out2 = buf[i * BYTE_PER_WORD + 2];
         acc_z = (int16_t)(fifo_data_out2 << 8 | fifo_data_out1);
-        rec_buf[saved_samples++] = acc_z;
+        
+        fifo_data_out1 = buf[i * BYTE_PER_WORD + 3];
+        fifo_data_out2 = buf[i * BYTE_PER_WORD + 4];
+        acc_y = (int16_t)(fifo_data_out2 << 8 | fifo_data_out1);
+
+        fifo_data_out1 = buf[i * BYTE_PER_WORD + 5];
+        fifo_data_out2 = buf[i * BYTE_PER_WORD + 6];
+        acc_x = (int16_t)(fifo_data_out2 << 8 | fifo_data_out1);
+
+        rec_buf[saved_samples * 3] = acc_x;
+        rec_buf[saved_samples * 3 + 1] = acc_y;
+        rec_buf[(saved_samples++) * 3 + 2] = acc_z;
         if(saved_samples >= tot_samples_to_save) {
             err = gpio_pin_interrupt_configure_dt(&int1_gpio, GPIO_INT_DISABLE);
             if(err) printk("Failed to disable the interrupt on pin %d. Error: %d\n", int1_gpio.pin, err);
