@@ -2,6 +2,7 @@ import subprocess
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import yaml
 
 from pathlib import Path
 from datetime import datetime
@@ -200,10 +201,22 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     dt = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename_npz = f"{dt}_{board_id}.npz"
-    filename_txt = f"{dt}_{board_id}.txt"
+    filename_yaml = f"{dt}_{board_id}.yaml"
     path = OUTPUT_DIR / filename_npz
-    txt_path = OUTPUT_DIR / filename_txt
-    txt_path.touch()
+    yaml_path = OUTPUT_DIR / filename_yaml
+    
+    yaml_dict = {
+        "desc": "",
+        "board_id": board_id,
+        "saved_samples": saved_samples[0],
+        "distance": "",
+        "sensor_count": "",
+        "array_center_pos": "",
+        "source_pos": "",
+    }
+    with open(yaml_path, "w") as f:
+        yaml.safe_dump(yaml_dict, f, sort_keys=False)
+        
     np.savez(path, acc=rec_buf, timestamp=correct_tick_err(rec_ts))
 
     if(SHOW_PLOTS):
