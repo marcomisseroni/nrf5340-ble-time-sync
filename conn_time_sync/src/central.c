@@ -50,7 +50,7 @@
 #define ADV_NAME_STR_MAX_LEN (sizeof(CONFIG_BT_DEVICE_NAME))
 
 // Countdown time to start the dataset collection and duration of the dataset collection
-#define COUNTDOWN_TIME_MS 1500
+#define COUNTDOWN_TIME_MS 20000
 #define REC_DURATION_S 5 
 
 static void scan_start(void);
